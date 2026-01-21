@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Gorilla Tag WebXR</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; background-color: #000; font-family: sans-serif; overflow: hidden; }
+        #overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; color: white; z-index: 10;
+        }
+        button {
+            padding: 20px 40px; font-size: 24px; cursor: pointer;
+            background: #795548; color: white; border: none; border-radius: 10px;
+            box-shadow: 0 5px #3e2723;
+        }
+        button:active { transform: translateY(4px); box-shadow: 0 1px #3e2723; }
+    </style>
+</head>
+<body>
+    <div id="overlay">
+        <h1>GORILLA WEB VR</h1>
+        <p>Use your hands to push off the floor!</p>
+        <button id="vr-button">ENTER VR MODE</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
+
+        let xrSession = null;
+        let xrRefSpace = null;
+        let renderer, scene, camera;
+        let playerGroup; // This is the "Gorilla Body"
+        
+        // Physics Variables
+        let velocity = new THREE.Vector3(0, 0, 0);
+        let gravity = -0.015;
+        let lastHandPositions = [new THREE.Vector3(), new THREE.Vector3()];
+
+        const vrButton = document.getElementById('vr-button');
+
+        // 1. Setup Three.js Scene (The World)
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87ceeb); // Sky Blue
+
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            // Light
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(1, 10, 1);
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x404040));
+
+            // Floor (Green Forest Ground)
+            const floor = new THREE.Mesh(
+                new THREE.PlaneGeometry(100, 100),
+                new THREE.MeshStandardMaterial({ color: 0x228b22 })
+            );
+            floor.rotation.x = -Math.PI / 2;
+            scene.add(floor);
+
+            // Player Rigging
+            playerGroup = new THREE.Group();
+            scene.add(playerGroup);
+            playerGroup.add(camera);
+
+            // Start Animation
+            renderer.setAnimationLoop(render);
+        }
+
+        // 2. WebXR "Enter VR" Logic
+        async function onEnterVR() {
+            if (xrSession === null) {
+                try {
+                    const session = await navigator.xr.requestSession('immersive-vr', {
+                        requiredFeatures: ['local-floor']
+                    });
+                    xrSession = session;
+                    renderer.xr.setSession(xrSession);
+                    document.getElementById('overlay').style.display = 'none';
+                } catch (e) {
+                    alert("VR Failed: " + e.message);
+                }
+            }
+        }
+
+        vrButton.addEventListener('click', onEnterVR);
+
+        // 3. The Core "Gorilla Locomotion" Physics
+        function updateLocomotion(frame) {
+            const session = frame.session;
+            const inputSources = session.inputSources;
+
+            for (let i = 0; i < inputSources.length; i++) {
+                const input = inputSources[i];
+                if (!input.gripSpace) continue;
+
+                const pose = frame.getPose(input.gripSpace, renderer.xr.getReferenceSpace());
+                if (pose) {
+                    const handIdx = input.handedness === 'left' ? 0 : 1;
+                    const currentPos = new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(pose.transform.matrix));
+
+                    // Calculate Hand Speed
+                    const handMovement = currentPos.clone().sub(lastHandPositions[handIdx]);
+                    
+                    // GORILLA PHYSICS: If hand "slams" the floor (near y=0)
+                    // The floor is at y=0. We check if your hand is pushing down near it.
+                    if (currentPos.y < 0.2 && handMovement.y < 0) {
+                        // Move player in the OPPOSITE direction of the hand move
+                        velocity.x -= handMovement.x * 20;
+                        velocity.y -= handMovement.y * 30; // Jump force
+                        velocity.z -= handMovement.z * 20;
+                    }
+
+                    lastHandPositions[handIdx].copy(currentPos);
+                }
+            }
+
+            // Apply Gravity & Friction
+            velocity.y += gravity;
+            velocity.x *= 0.95; // Air resistance
+            velocity.z *= 0.95;
+
+            // Update Body Position
+            playerGroup.position.add(velocity);
+
+            // Ground Stop
+            if (playerGroup.position.y < 0) {
+                playerGroup.position.y = 0;
+                velocity.y = 0;
+            }
+        }
+
+        // 4. Game Loop
+        function render(time, frame) {
+            if (frame) {
+                updateLocomotion(frame);
+            }
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gorilla Tag WebXR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; overflow: hidden; background: #222; font-family: sans-serif; }
+        #vr-button { 
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            padding: 20px 40px; font-size: 20px; background: #ff4757; color: white;
+            border: none; border-radius: 10px; cursor: pointer; z-index: 100;
+        }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <button id="vr-button">ENTER VR MODE</button>
+    <canvas id="gameCanvas"></canvas>
+
+<script type="module">
+    // WebXR is complex, so we use a simplified physics loop
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const vrButton = document.getElementById('vr-button');
+
+    let xrSession = null;
+    let xrRefSpace = null;
+
+    // Gorilla Physics State
+    let playerPos = { x: 0, y: 1.6, z: 0 }; // Start at human height
+    let playerVel = { x: 0, y: 0, z: 0 };
+    let lastHandPos = [new Vector3(), new Vector3()]; // Track Left/Right velocity
+
+    // Simple Vector3 helper for math
+    function Vector3(x=0, y=0, z=0) {
+        this.x = x; this.y = y; this.z = z;
+    }
+
+    // Check for WebXR Support
+    if ('xr' in navigator) {
+        navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+            if (supported) vrButton.addEventListener('click', onEnterVR);
+            else vrButton.textContent = "VR NOT SUPPORTED";
+        });
+    }
+
+    async function onEnterVR() {
+        xrSession = await navigator.xr.requestSession('immersive-vr', {
+            optionalFeatures: ['local-floor', 'bounded-floor']
+        });
+        vrButton.style.display = 'none';
+        xrSession.addEventListener('end', () => { active = false; });
+        
+        // Initialize WebGL context here for a real 3D app
+        // For this demo, we use the XR Frame loop to calculate physics
+        xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
+        xrSession.requestAnimationFrame(onXRFrame);
+    }
+
+    function onXRFrame(time, frame) {
+        let session = frame.session;
+        session.requestAnimationFrame(onXRFrame);
+        let pose = frame.getViewerPose(xrRefSpace);
+
+        if (pose) {
+            // Iterate through controllers (input sources)
+            for (let inputSource of session.inputSources) {
+                if (!inputSource.gripSpace) continue;
+
+                let handPose = frame.getPose(inputSource.gripSpace, xrRefSpace);
+                if (handPose) {
+                    let handIdx = inputSource.handedness === 'left' ? 0 : 1;
+                    let currentHandPos = handPose.transform.position;
+
+                    // Calculate Hand Velocity
+                    let dx = currentHandPos.x - lastHandPos[handIdx].x;
+                    let dy = currentHandPos.y - lastHandPos[handIdx].y;
+                    let dz = currentHandPos.z - lastHandPos[handIdx].z;
+
+                    // GORILLA PHYSICS: If hand is near the floor (y < 0.1) and moving down
+                    if (currentHandPos.y < 0.2 && dy < 0) {
+                        // Launch player in opposite direction of hand slam
+                        playerVel.x -= dx * 5;
+                        playerVel.y -= dy * 10; // Stronger upward lift
+                        playerVel.z -= dz * 5;
+                    }
+
+                    // Store current pos for next frame velocity calc
+                    lastHandPos[handIdx] = new Vector3(currentHandPos.x, currentHandPos.y, currentHandPos.z);
+                }
+            }
+        }
+
+        updatePhysics();
+    }
+
+    function updatePhysics() {
+        // Apply Gravity
+        playerVel.y -= 0.01; 
+        
+        // Update Position
+        playerPos.x += playerVel.x;
+        playerPos.y += playerVel.y;
+        playerPos.z += playerVel.z;
+
+        // Ground Collision
+        if (playerPos.y < 0) {
+            playerPos.y = 0;
+            playerVel.y = 0;
+            // Friction
+            playerVel.x *= 0.9;
+            playerVel.z *= 0.9;
+        }
+    }
+
+    // Standard 2D Render for Desktop preview
+    function draw() {
+        if (!xrSession) {
+            // Draw a simple preview for PC/iPad
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0,0,canvas.width, canvas.height);
+            ctx.fillStyle = '#fff';
+            ctx.fillText("Open this on an Oculus/Meta Quest Browser to play in VR", 50, 50);
+        }
+        requestAnimationFrame(draw);
+    }
+    draw();
+</script>
+</body>
+</html>

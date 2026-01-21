@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gorilla Tag VR Fix</title>
+    <style>
+        body { margin: 0; background: #000; color: white; text-align: center; font-family: sans-serif; }
+        #vr-btn { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            padding: 25px 50px; font-size: 20px; background: #e74c3c; border: none; 
+            border-radius: 10px; color: white; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <button id="vr-btn">ENTER GORILLA VR</button>
+    <canvas id="canvas"></canvas>
+
+<script type="module">
+    const btn = document.getElementById('vr-btn');
+    const canvas = document.getElementById('canvas');
+    
+    // Create the "Handshake" context
+    const gl = canvas.getContext('webgl', { xrCompatible: true });
+
+    async function startVR() {
+        if (!navigator.xr) {
+            alert("NO WEBXR: Are you using HTTPS or Chrome Flags?");
+            return;
+        }
+
+        try {
+            // Requesting the VR session
+            const session = await navigator.xr.requestSession('immersive-vr', {
+                requiredFeatures: ['local-floor']
+            });
+
+            alert("VR CONNECTED! Put your headset on.");
+            btn.style.display = 'none';
+            
+            // Start the VR loop
+            session.addEventListener('end', () => { btn.style.display = 'block'; });
+            const refSpace = await session.requestReferenceSpace('local-floor');
+            
+            // PHYSICS START HERE
+            session.requestAnimationFrame(function onFrame(t, frame) {
+                session.requestAnimationFrame(onFrame);
+                // (Physics logic goes here...)
+            });
+
+        } catch (e) {
+            // This tells you EXACTLY why the button isn't working
+            alert("SYSTEM ERROR: " + e.message);
+        }
+    }
+
+    btn.addEventListener('click', startVR);
+</script>
+</body>
+</html><!DOCTYPE html>
+<html>
+<head>
+    <title>Gorilla Tag VR Fix</title>
+    <style>
+        body { margin: 0; background: #000; color: white; text-align: center; font-family: sans-serif; }
+        #vr-btn { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            padding: 25px 50px; font-size: 20px; background: #e74c3c; border: none; 
+            border-radius: 10px; color: white; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <button id="vr-btn">ENTER GORILLA VR</button>
+    <canvas id="canvas"></canvas>
+
+<script type="module">
+    const btn = document.getElementById('vr-btn');
+    const canvas = document.getElementById('canvas');
+    
+    // Create the "Handshake" context
+    const gl = canvas.getContext('webgl', { xrCompatible: true });
+
+    async function startVR() {
+        if (!navigator.xr) {
+            alert("NO WEBXR: Are you using HTTPS or Chrome Flags?");
+            return;
+        }
+
+        try {
+            // Requesting the VR session
+            const session = await navigator.xr.requestSession('immersive-vr', {
+                requiredFeatures: ['local-floor']
+            });
+
+            alert("VR CONNECTED! Put your headset on.");
+            btn.style.display = 'none';
+            
+            // Start the VR loop
+            session.addEventListener('end', () => { btn.style.display = 'block'; });
+            const refSpace = await session.requestReferenceSpace('local-floor');
+            
+            // PHYSICS START HERE
+            session.requestAnimationFrame(function onFrame(t, frame) {
+                session.requestAnimationFrame(onFrame);
+                // (Physics logic goes here...)
+            });
+
+        } catch (e) {
+            // This tells you EXACTLY why the button isn't working
+            alert("SYSTEM ERROR: " + e.message);
+        }
+    }
+
+    btn.addEventListener('click', startVR);
+</script>
+</body>
+</html>
